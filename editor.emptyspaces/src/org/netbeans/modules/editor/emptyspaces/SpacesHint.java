@@ -6,10 +6,12 @@ package org.netbeans.modules.editor.emptyspaces;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 import javax.swing.text.BadLocationException;
@@ -30,6 +32,7 @@ import org.netbeans.spi.editor.hints.Severity;
 import org.openide.text.NbDocument;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
+import org.openide.util.Pair;
 
 /**
  *
@@ -198,8 +201,21 @@ public final class SpacesHint implements PropertyChangeListener, CaretListener {
                 @Override
                 public void run() {
                     final HighlightsSequence seq = bag.getHighlights(0, doc.getLength());
+                    final Deque<Pair<Integer,Integer>> spaces = new ArrayDeque<Pair<Integer, Integer>>();
                     while (seq.moveNext()) {
-                        //Todo
+                        final int start = seq.getStartOffset();
+                        final int end = seq.getEndOffset();
+                        spaces.offer(Pair.<Integer,Integer>of(start,end));
+                    }
+                    try {
+                        while (!spaces.isEmpty()) {
+                            final Pair<Integer,Integer> bounds = spaces.removeLast();
+                            final int start = bounds.first();
+                            final int end = bounds.second();
+                            doc.remove(start, end-start);
+                        }
+                    } catch (BadLocationException ex) {
+                        Exceptions.printStackTrace(ex);
                     }
                 }
             });
