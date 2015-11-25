@@ -16,13 +16,18 @@ import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
+import org.netbeans.api.editor.document.EditorDocumentUtils;
+import org.netbeans.api.editor.mimelookup.MimeLookup;
+import org.netbeans.api.editor.mimelookup.MimePath;
 import org.netbeans.api.editor.settings.AttributesUtilities;
+import org.netbeans.api.editor.settings.FontColorSettings;
 import org.netbeans.spi.editor.highlighting.HighlightsLayer;
 import org.netbeans.spi.editor.highlighting.HighlightsLayerFactory;
 import org.netbeans.spi.editor.highlighting.ZOrder;
 import org.netbeans.spi.editor.highlighting.support.OffsetsBag;
+import org.openide.filesystems.FileObject;
 import org.openide.text.NbDocument;
-import org.openide.util.WeakListeners;
+import org.openide.util.*;
 
 /**
  *
@@ -37,26 +42,38 @@ public class SpacesFactory implements HighlightsLayerFactory, DocumentListener {
     public HighlightsLayer[] createLayers(final Context cntxt) {
         final Document doc = cntxt.getDocument();
         final JTextComponent comp = cntxt.getComponent();
-        final HighlightsLayer layer = HighlightsLayer.create(LAYER_NAME, ZOrder.TOP_RACK, true, compute(getContainer(doc, comp),doc));   //NOI18N
+        final FileObject file = EditorDocumentUtils.getFileObject(doc);
+        final FontColorSettings settings = MimeLookup
+                .getLookup(file != null ? MimePath.get(file.getMIMEType()) : MimePath.EMPTY)
+                .lookup(FontColorSettings.class);
+        AttributeSet color = settings.getFontColors("trailing-whitespace"); //NOI18N
+        if (color == null) {
+            color = defaultColor(comp);
+        }
+        final HighlightsLayer layer = HighlightsLayer.create(LAYER_NAME, ZOrder.TOP_RACK, true, compute(getContainer(doc, color),doc));   //NOI18N
         return new HighlightsLayer[] {layer};
     }
 
-    private OffsetsBag getContainer(final Document doc, final JTextComponent comp) {
+    private OffsetsBag getContainer(final Document doc, AttributeSet color) {
         OffsetsBag curBag = (OffsetsBag) doc.getProperty(ATTR_BAG);
         if (curBag == null) {
             curBag = new OffsetsBag(doc);
             doc.addDocumentListener(WeakListeners.document(this, doc));
-            Color c = comp.getBackground();
-            if (c == null) {
-                c = Color.WHITE;
-            }
-            doc.putProperty(ATTR_COLOR, AttributesUtilities.createImmutable(StyleConstants.Background, isDark(c) ? c.brighter() : c.darker()));
+            doc.putProperty(ATTR_COLOR, color);
             doc.putProperty(ATTR_BAG, curBag);
         }
         return curBag;
     }
 
-    private boolean isDark (final Color c) {
+    private static AttributeSet defaultColor(final JTextComponent comp) {
+        Color c = comp.getBackground();
+        if (c == null) {
+            c = Color.WHITE;
+        }
+        return AttributesUtilities.createImmutable(StyleConstants.Background, isDark(c) ? c.brighter() : c.darker());
+    }
+
+    private static boolean isDark (final Color c) {
         int res = (c.getBlue() + c.getGreen() + c.getRed())/3;
         return res < 128;
     }
